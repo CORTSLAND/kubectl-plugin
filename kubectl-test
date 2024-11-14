@@ -1,0 +1,26 @@
+#!/bin/bash
+
+
+case "$1" in
+
+  secret)
+    read -p "Enter Secret Name: " secretName
+    read -p "Enter Namespace: " namespace
+    read -p "Enter Secret Key, or leave blank to return all: " secretKey
+    if [[ $secretKey == "" ]]; then
+      for row in $(kubectl get secret $secretName -n $namespace -o json | jq -r '.data | to_entries[] | "\(.key)=\(.value)"'); do
+        key=$(echo "${row}" | cut -d '=' -f 1)
+        encoded_value=$(echo "${row}" | cut -d '=' -f 2)
+        decoded_value=$(echo "$encoded_value" | base64 -d)
+        echo -e "${key}:\n ${decoded_value}\n"
+      done
+    else
+      kubectl get secret $secretName -n $namespace -o json | jq -r '.data.$secretKey' | base64 -d
+    fi
+
+    ;;
+
+  *)
+    echo cool
+    ;;
+esac
