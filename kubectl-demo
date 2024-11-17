@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Display helper info
+show_help() {
+  echo "Usage: kubectl test secret [options]"
+  echo "Options:"
+  echo "  -n, --namespace  Specify the namespace (default is 'default')"
+  echo "  -s, --secretname Specify the name of the secret (required)"
+  echo "  -k, --secretkey  Specify the key inside of the kubernetes secret (default will list all key:value inside of the secret)"
+  echo "  -o, --output     Inspect the certificate with the (step) command"
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -n| --namespace)
+      namespace="$2"
+      shift 2
+      ;;
+    -s| --secretname)
+      secretName="$2"
+      shift 2
+      ;;
+    -k| --secretKey)
+      secretKey="$2"
+      shift 2
+      ;;
+    -o| --output)
+      step=true
+      shift 1
+      ;;
+    *)
+      echo '$1 is not a valid option'
+      show_help
+      exit 1
+      ;;
+  esac
+done
+
+# check for secretName
+if [[ -z "$secretName" ]]; then
+  echo 'Error: Must provide the name of the secret.'
+  show_help
+  exit 1
+fi
+
+# transform the secret
+if [[ $secretKey == "" ]]; then
+  for row in $(kubectl get secret $secretName -n $namespace -o json | jq -r '.data | del(._raw) | to_entries[] | "\(.key)=\(.value)"'); do
+    key=$(echo "${row}" | cut -d '=' -f 1)
+    encoded_value=$(echo "${row}" | cut -d '=' -f 2)
+
+    #see if secret has key when output is set
+    keySearch=$(echo $key | grep -q "\.key"; echo $?)
+
+    # if step is set run the step command
+    if [[ $step && $keySearch -ne 0 ]]; then
+      decoded_value=$(echo "$encoded_value" | base64 -d | step certificate inspect)
+      echo -e "${key}:\n ${decoded_value}\n"
+    else
+      decoded_value=$(echo "$encoded_value" | base64 -d)
+      echo -e "${key}:\n ${decoded_value}\n"
+    fi
+  done
+else
+  keySearch=$(echo $secretKey | grep -q "\.key"; echo $?)
+  if [[ $step && keySearch -ne 0 ]]; then
+    kubectl get secret $secretName -n $namespace -o json | jq -r '.data."'"$secretKey"'"' | base64 -d | step certificate inspect
+  else
+    kubectl get secret $secretName -n $namespace -o json | jq -r '.data."'"$secretKey"'"' | base64 -d
+  fi
+fi
+
