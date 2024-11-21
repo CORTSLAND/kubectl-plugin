@@ -2,7 +2,7 @@
 
 # Display helper info
 show_help() {
-  echo "Usage: kubectl test secret [options]"
+  echo "Usage: kubectl demo [options]"
   echo "Options:"
   echo "  -n, --namespace  Specify the namespace (default is 'default')"
   echo "  -s, --secretname Specify the name of the secret (required)"
